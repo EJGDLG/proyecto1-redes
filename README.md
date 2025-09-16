@@ -1,32 +1,30 @@
-# Servidor MCP Local – Edwin – 2025-09-04
 
-## Requisitos
-- Python 3.11+
+# Proyecto MCP – Versión Final (Host + Servidor Local + Prueba de Carga)
+
+Incluye host en consola (OpenAI + tools), servidor MCP local (complejidad ciclomática),
+prueba de carga y logs.
 
 ## Instalación
 ```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# Linux/Mac
+source .venv/bin/activate
 pip install -r requirements.txt
+copy .env.example .env
 ```
-
-## Ejecutar servidor (Windows)
+## Host
 ```bash
-scripts\run_server.bat
+python -m app.host.main
 ```
-
-## Ejecutar servidor (Linux/Mac)
+## Servidor solo
 ```bash
-bash scripts/run_server.sh
+scripts\run_server.bat   # Windows
+bash scripts/run_server.sh # Linux/Mac
 ```
-
-## Prueba de carga (Windows)
+## Prueba de carga
 ```bash
 scripts\run_loadtest.bat
-```
-
-## Prueba de carga (Linux/Mac)
-```bash
 bash scripts/run_loadtest.sh
 ```
-
-## Evidencia
-Los resultados de la prueba de carga se encuentran en la carpeta `evidencia/`.

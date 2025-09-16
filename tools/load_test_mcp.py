@@ -1,3 +1,4 @@
+
 import asyncio, json, time, argparse, random, shlex, sys, csv
 from pathlib import Path
 
@@ -99,7 +100,7 @@ def summarize(samples, elapsed, total):
     }
 
 def save_reports(samples, summary):
-    logs = Path("evidencia"); logs.mkdir(parents=True, exist_ok=True)
+    logs = Path("logs"); logs.mkdir(parents=True, exist_ok=True)
     (logs/"load_report.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     with open(logs/"load_samples.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -108,10 +109,10 @@ def save_reports(samples, summary):
             w.writerow([s["ok"], f"{s['latency_ms']:.2f}", s["error"]])
 
 async def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--command", required=True)
-    ap.add_argument("--method", default="tools/call")
-    ap.add_argument("--name", default="code/complexity/analyze")
+    ap = argparse.ArgumentParser(description="Prueba de carga para un servidor MCP por STDIO")
+    ap.add_argument("--command", required=True, help="Comando para lanzar el servidor MCP, ej: \"python -u app/mcp_local/server.py\"")
+    ap.add_argument("--method", default="tools/call", help="Método JSON-RPC a invocar")
+    ap.add_argument("--name", default="code/complexity/analyze", help="Nombre de la herramienta a invocar")
     ap.add_argument("--concurrency", type=int, default=10)
     ap.add_argument("--requests", type=int, default=200)
     args = ap.parse_args()

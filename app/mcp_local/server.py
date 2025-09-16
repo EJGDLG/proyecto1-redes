@@ -1,7 +1,8 @@
+
 import sys, json, ast
 from typing import Dict, Any
 
-def jprint(obj):
+def jprint(obj): 
     sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n"); sys.stdout.flush()
 
 def ok(id, result): jprint({"jsonrpc":"2.0","id":id,"result":result})
