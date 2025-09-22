@@ -1,0 +1,1 @@
+{"ts": "2025-09-22T04:57:43Z", "direction": "send", "messages": [{"role": "system", "content": "You are an MCP-capable assistant. When the user asks to read/write files, analyze code, or run repo actions, use the 'mcp_call' tool with the appropriate server and method."}, {"role": "user", "content": "hola"}]}

@@ -2,12 +2,18 @@ import os, json, asyncio, time
 from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
-from .mcp_client import MCPClientManager
-from .tool_router import OPENAI_TOOLS
+from app.host.mcp_client import MCPClientManager
+from app.host.tool_router import OPENAI_TOOLS
+from rich.console import Console
+from rich.panel import Panel
+from rich.markdown import Markdown
+from rich.table import Table
 
 load_dotenv()
+
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 client = OpenAI()
+console = Console()
 
 def save_llm_log(direction, payload):
     Path("logs").mkdir(exist_ok=True, parents=True)
@@ -23,19 +29,34 @@ async def start_manager():
     await mgr.start_all()
     return mgr
 
-async def run_chat():
+def header():
+    t = Table.grid(expand=True)
+    t.add_column(); t.add_column(justify="right")
+    t.add_row("[bold]Proyecto MCP – Terminal UI[/bold]", f"[dim]Modelo:[/dim] {MODEL}")
+    return Panel(t, style="cyan", padding=(1,2))
+
+async def chat_loop():
     mgr = await start_manager()
     messages = [{
         "role": "system",
         "content": ("You are an MCP-capable assistant. "
-                    "When the user asks to read/write files, analyze code, or run repo actions, "
+                    "If a user asks to read/write files, analyze code, or run repo actions, "
                     "use the 'mcp_call' tool with the appropriate server and method.")
     }]
-    print(f"Modelo: {MODEL}\nEscribe 'exit' para salir.\n")
+
+    console.print(header())
+    console.print(Panel("Comandos: [bold]/exit[/bold] salir · [bold]/tools[/bold] listar herramientas.", style="green"))
 
     while True:
-        user = input("> ").strip()
-        if user.lower() in ("exit","quit"): break
+        user = console.input("[bold magenta]Tú >[/bold magenta] ").strip()
+        if user.lower() in ("exit","/exit","quit"): 
+            console.print("[dim]Saliendo...[/dim]")
+            break
+        if user.lower() in ("/tools","tools"):
+            tools = await mgr.call("local-complexity", "tools/list", {})
+            console.print(Panel(Markdown(f"### Tools Locales\n```json\n{json.dumps(tools, indent=2, ensure_ascii=False)}\n```"), title="tools/list"))
+            continue
+
         messages.append({"role":"user","content":user})
 
         save_llm_log("send", {"messages": messages})
@@ -51,6 +72,7 @@ async def run_chat():
 
         tool_msgs = []
         if msg.tool_calls:
+            console.print(Panel("[dim]Invocando herramientas MCP...[/dim]", style="blue"))
             for tc in msg.tool_calls:
                 if tc.type != "function": continue
                 fn = tc.function.name
@@ -86,11 +108,11 @@ async def run_chat():
             )
             save_llm_log("recv", {"raw": r2.model_dump()})
             final_text = r2.choices[0].message.content
-            print(final_text)
+            console.print(Panel(Markdown(final_text or "_(sin contenido)_"), title="Asistente"))
             messages.append({"role":"assistant","content":final_text})
         else:
-            print(msg.content)
+            console.print(Panel(Markdown(msg.content or "_(sin contenido)_"), title="Asistente"))
             messages.append({"role":"assistant","content":msg.content})
 
 if __name__ == "__main__":
-    asyncio.run(run_chat())
+    asyncio.run(chat_loop())
