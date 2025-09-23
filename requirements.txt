@@ -1,4 +1,6 @@
 openai>=1.40.0
 python-dotenv>=1.0.1
 pydantic>=2.8.2
+rich>=13.7.0
 uvloop; platform_system!="Windows"
+streamlit>=1.37.0
