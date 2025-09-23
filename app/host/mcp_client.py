@@ -1,16 +1,16 @@
-import asyncio, json, sys, time, threading
+import sys, json, time, threading, subprocess, asyncio
 from pathlib import Path
 
 LOG_DIR = Path("logs"); LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-def jdump(obj): return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+def jdump(obj):
+    return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
 
 class MCPProcessClient:
     def __init__(self, name, command):
         self.name = name
         self.command = command
         self.proc = None
-        self.next_id = 1
         self.pending = {}
         self.reader = None
         self.writer = None
@@ -29,25 +29,28 @@ class MCPProcessClient:
                 f.write(jdump(entry) + "\n")
 
     async def start(self):
-        self.proc = await asyncio.create_subprocess_exec(
-            *self.command,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=sys.stderr,
+        # 🚀 Versión para Windows usando subprocess.Popen
+        self.proc = subprocess.Popen(
+            self.command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
         )
         self.reader = self.proc.stdout
         self.writer = self.proc.stdin
-        asyncio.create_task(self._read_loop())
-        return await self.call("initialize", {"protocolVersion": "2024-08-01"})
 
-    async def _read_loop(self):
-        while True:
-            line = await self.reader.readline()
-            if not line: break
+        # Inicia un hilo para leer la salida del servidor
+        threading.Thread(target=self._read_loop_sync, daemon=True).start()
+
+        return {"ok": True, "msg": f"Servidor {self.name} iniciado"}
+
+    def _read_loop_sync(self):
+        for line in self.reader:
             try:
-                msg = json.loads(line.decode("utf-8"))
+                msg = json.loads(line.strip())
             except Exception:
-                self._log("recv", {"type": "garbled", "raw": line.decode("utf-8", "ignore")})
+                self._log("recv", {"type": "garbled", "raw": line})
                 continue
             self._log("recv", {"type": "jsonrpc", "msg": msg})
             if "id" in msg and ("result" in msg or "error" in msg):
@@ -56,18 +59,22 @@ class MCPProcessClient:
                     fut.set_result(msg)
 
     async def call(self, method, params=None):
-        _id = self.next_id; self.next_id += 1
+        _id = len(self.pending) + 1
         req = {"jsonrpc": "2.0", "id": _id, "method": method, "params": params or {}}
-        data = (jdump(req) + "\n").encode("utf-8")
+        data = (jdump(req) + "\n")
         self._log("send", {"type": "jsonrpc", "msg": req})
+
         self.writer.write(data)
-        await self.writer.drain()
-        fut = asyncio.get_event_loop().create_future()
+        self.writer.flush()
+
+        loop = asyncio.get_event_loop()
+        fut = loop.create_future()
         self.pending[_id] = fut
         resp = await fut
         if "error" in resp:
             raise RuntimeError(f"MCP error: {resp['error']}")
         return resp["result"]
+
 
 class MCPClientManager:
     def __init__(self, cfg):
@@ -80,10 +87,10 @@ class MCPClientManager:
                 client = MCPProcessClient(s["name"], s["command"])
                 await client.start()
                 self.clients[s["name"]] = client
-            except Exception:
+            except Exception as e:
                 if s.get("optional"):
                     continue
-                raise
+                raise RuntimeError(f"No se pudo iniciar el servidor {s['name']}: {e}")
 
     async def call(self, server, method, params):
         if server not in self.clients:

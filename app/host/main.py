@@ -1,3 +1,9 @@
+import sys, asyncio
+
+# 🔧 Fix: usar loop compatible con subprocess en Windows
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import os, json, asyncio, time
 from pathlib import Path
 from dotenv import load_dotenv
