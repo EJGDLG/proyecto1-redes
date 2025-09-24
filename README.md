@@ -85,7 +85,17 @@ pip install -r requirements.txt
 python main.py --tui
 
 2. Ejecutar la interfaz web con Streamlit
-streamlit run app/web/streamlit_app.py
+python -m streamlit run app/ui_web_streamlit.py
+
+3. Comprobar si el servidor remoto funciona
+# tools/list
+>> $body = '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+>> Invoke-RestMethod -Uri 'https://remote-mcp-utils.onrender.com/' -Method Post -ContentType 'application/json' -Body $body | ConvertTo-Json -Depth 6        
+>> 
+>> # tools/call: word_count
+>> $body = '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"text/word_count","arguments":{"text":"hola desde mi host"}}}'
+>> Invoke-RestMethod -Uri 'https://remote-mcp-utils.onrender.com/' -Method Post -ContentType 'application/json' -Body $body | ConvertTo-Json -Depth 6    
+
 
 ---
 ## Funcionalidades
