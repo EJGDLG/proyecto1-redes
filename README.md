@@ -96,6 +96,8 @@ python -m streamlit run app/ui_web_streamlit.py
 >> $body = '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"text/word_count","arguments":{"text":"hola desde mi host"}}}'
 >> Invoke-RestMethod -Uri 'https://remote-mcp-utils.onrender.com/' -Method Post -ContentType 'application/json' -Body $body | ConvertTo-Json -Depth 6    
 
+## si fuenar necesario
+-m pip install httpx
 
 ---
 ## Funcionalidades
