@@ -85,30 +85,73 @@ pip install -r requirements.txt
 python main.py --tui
 
 2. Ejecutar la interfaz web con Streamlit
-python -m streamlit run app/ui_web_streamlit.py
-
-3. Comprobar si el servidor remoto funciona
-# tools/list
->> $body = '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
->> Invoke-RestMethod -Uri 'https://remote-mcp-utils.onrender.com/' -Method Post -ContentType 'application/json' -Body $body | ConvertTo-Json -Depth 6        
->> 
->> # tools/call: word_count
->> $body = '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"text/word_count","arguments":{"text":"hola desde mi host"}}}'
->> Invoke-RestMethod -Uri 'https://remote-mcp-utils.onrender.com/' -Method Post -ContentType 'application/json' -Body $body | ConvertTo-Json -Depth 6    
-
-## si fuenar necesario
--m pip install httpx
+streamlit run app/web/streamlit_app.py
 
 ---
 ## Funcionalidades
 
-- Menús interactivos en consola para ejecutar comandos del MCP.
+Pendiente
 
-- Interfaz gráfica para visualización de resultados.
+## mensajes de prueba
+- Flujo integrado (todo junto)
 
-- Scripts adicionales para pruebas, ejemplos y automatización (ubicados en scripts/).
+Crear archivo
 
-- Fácil extensión: nuevos módulos pueden añadirse en app/.
+1. Crea un archivo llamado test.txt con el contenido "Hola MCP".
+
+
+→ Llama filesystem/write_file
+
+Leer archivo
+2. 
+Lee el contenido de test.txt.
+
+
+→ Llama filesystem/read_file
+
+Listar directorio
+
+3. Muéstrame todos los archivos en la carpeta actual.
+
+
+→ Llama filesystem/list_dir
+
+Eliminar archivo
+
+4.Borra el archivo test.txt.
+
+
+→ Llama filesystem/delete_file
+
+🔧 Pruebas para Git (cuando ya tengas git_mcp.py en stdio)
+
+Inicializar repo
+
+1. Inicializa un repositorio Git en la carpeta ./mi_repo
+
+
+→ Llama git/init
+
+Ver estado
+
+2. Dame el estado del repositorio en ./mi_repo
+
+
+→ Llama git/status
+
+Commit cambios
+
+3. Haz commit en ./mi_repo con el mensaje "Se agregó test.txt".
+
+- RCA 
+
+1. Genera llaves RSA con primos entre 50 y 100.
+
+2. Encripta el número 25 con la clave pública generada.
+
+3. Desencripta el número cifrado con la clave privada.
+
+4. Genera un mapa comparativo del lago Atitlán entre 2020 y 2025 y dime la ruta del HTML.
 
 ## Notas
 

@@ -1,19 +1,11 @@
-# app/host/mcp_client.py
-import sys, json, time, threading, subprocess, asyncio, itertools
+import sys, json, time, threading, subprocess, asyncio, requests
 from pathlib import Path
-
-# http (para servidores remotos)
-try:
-    import httpx
-except Exception:
-    httpx = None
 
 LOG_DIR = Path("logs"); LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 def jdump(obj):
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
 
-# ------------------------ Cliente por proceso (stdio) ------------------------
 class MCPProcessClient:
     def __init__(self, name, command):
         self.name = name
@@ -37,7 +29,6 @@ class MCPProcessClient:
                 f.write(jdump(entry) + "\n")
 
     async def start(self):
-        # Lanzar proceso (stdio)
         self.proc = subprocess.Popen(
             self.command,
             stdin=subprocess.PIPE,
@@ -47,10 +38,8 @@ class MCPProcessClient:
         )
         self.reader = self.proc.stdout
         self.writer = self.proc.stdin
-
-        # Hilo lector de stdout (una línea = un JSON-RPC)
         threading.Thread(target=self._read_loop_sync, daemon=True).start()
-        return {"ok": True, "msg": f"Servidor {self.name} iniciado (stdio)"}
+        return {"ok": True, "msg": f"Servidor {self.name} iniciado"}
 
     def _read_loop_sync(self):
         for line in self.reader:
@@ -58,18 +47,21 @@ class MCPProcessClient:
                 msg = json.loads(line.strip())
             except Exception:
                 self._log("recv", {"type": "garbled", "raw": line})
+                print(f"[{self.name}] ⚠️ Mensaje no válido: {line.strip()}", file=sys.stderr)
                 continue
             self._log("recv", {"type": "jsonrpc", "msg": msg})
+            print(f"[{self.name}] ⬅️ Recibido: {msg}", file=sys.stderr)
             if "id" in msg and ("result" in msg or "error" in msg):
                 fut = self.pending.pop(msg["id"], None)
                 if fut and not fut.done():
                     fut.set_result(msg)
 
-    async def call(self, method, params=None):
-        _id = len(self.pending) + 1
+    async def call(self, method, params=None, timeout=10):
+        _id = int(time.time_ns())  # ID único
         req = {"jsonrpc": "2.0", "id": _id, "method": method, "params": params or {}}
         data = (jdump(req) + "\n")
         self._log("send", {"type": "jsonrpc", "msg": req})
+        print(f"[{self.name}] ➡️ Enviando: {req}", file=sys.stderr)
 
         self.writer.write(data)
         self.writer.flush()
@@ -77,25 +69,22 @@ class MCPProcessClient:
         loop = asyncio.get_event_loop()
         fut = loop.create_future()
         self.pending[_id] = fut
-        resp = await fut
+
+        try:
+            resp = await asyncio.wait_for(fut, timeout=timeout)
+        except asyncio.TimeoutError:
+            raise RuntimeError(f"⏳ Timeout esperando respuesta de {self.name} (>{timeout}s)")
+
         if "error" in resp:
             raise RuntimeError(f"MCP error: {resp['error']}")
-        return resp.get("result", resp)
+        return resp["result"]
 
-    async def stop(self):
-        try:
-            if self.proc and self.proc.poll() is None:
-                self.proc.terminate()
-        except Exception:
-            pass
 
-# ------------------------ Cliente HTTP (servidor remoto) ---------------------
+# 🚀 Cliente HTTP para servidores remotos
 class MCPHttpClient:
     def __init__(self, name, url):
         self.name = name
-        self.url = url.rstrip("/")
-        self.session = None
-        self._id = itertools.count(1)
+        self.url = url
         self.log_path = LOG_DIR / f"mcp-{time.strftime('%Y%m%d')}.jsonl"
 
     def _log(self, direction, payload):
@@ -109,58 +98,46 @@ class MCPHttpClient:
             f.write(jdump(entry) + "\n")
 
     async def start(self):
-        if httpx is None:
-            raise RuntimeError("Falta httpx. Instala con: pip install httpx")
-        self.session = httpx.AsyncClient(timeout=30.0)
-        return {"ok": True, "msg": f"Servidor {self.name} listo (http: {self.url})"}
+        return {"ok": True, "msg": f"Cliente HTTP {self.name} listo en {self.url}"}
 
-    async def call(self, method, params=None):
-        rid = next(self._id)
-        req = {"jsonrpc": "2.0", "id": rid, "method": method, "params": params or {}}
-        self._log("send", {"type": "jsonrpc", "http_url": self.url, "msg": req})
-        resp = await self.session.post(self.url + "/", json=req)
-        data = resp.json()
-        self._log("recv", {"type": "jsonrpc", "http_url": self.url, "msg": data})
-        if "error" in data:
-            raise RuntimeError(f"MCP error: {data['error']}")
-        return data.get("result", data)
-
-    async def stop(self):
+    async def call(self, method, params=None, timeout=15):
+        req = {"jsonrpc": "2.0", "id": int(time.time_ns()), "method": method, "params": params or {}}
+        self._log("send", {"type": "jsonrpc", "msg": req})
+        print(f"[{self.name}] ➡️ POST {self.url} {req}", file=sys.stderr)
         try:
-            if self.session:
-                await self.session.aclose()
-        except Exception:
-            pass
+            r = requests.post(self.url, json=req, timeout=timeout)
+            r.raise_for_status()
+            msg = r.json()
+            self._log("recv", {"type": "jsonrpc", "msg": msg})
+            print(f"[{self.name}] ⬅️ Recibido: {msg}", file=sys.stderr)
+            if "error" in msg:
+                raise RuntimeError(f"MCP error: {msg['error']}")
+            return msg["result"]
+        except Exception as e:
+            raise RuntimeError(f"Error llamando a {self.name}: {e}")
 
-# ------------------------------ Manager --------------------------------------
+
 class MCPClientManager:
     def __init__(self, cfg):
         self.cfg = cfg
         self.clients = {}
 
     async def start_all(self):
-        for s in self.cfg.get("servers", []):
+        for s in self.cfg["servers"]:
             try:
-                transport = s.get("transport", "stdio")
-                if transport == "http":
-                    client = MCPHttpClient(s["name"], s["url"])
-                else:
+                if "command" in s:  # stdio
                     client = MCPProcessClient(s["name"], s["command"])
-                await client.start()
+                    await client.start()
+                elif "url" in s:  # http
+                    client = MCPHttpClient(s["name"], s["url"])
+                    await client.start()
+                else:
+                    raise RuntimeError("Config inválida: falta 'command' o 'url'")
                 self.clients[s["name"]] = client
             except Exception as e:
                 if s.get("optional"):
-                    # opcional: no detener todo si falla
                     continue
-                raise RuntimeError(f"No se pudo iniciar el servidor {s.get('name')}: {e}")
-
-    async def stop_all(self):
-        for c in list(self.clients.values()):
-            try:
-                if hasattr(c, "stop"):
-                    await c.stop()
-            except Exception:
-                pass
+                raise RuntimeError(f"No se pudo iniciar el servidor {s['name']}: {e}")
 
     async def call(self, server, method, params):
         if server not in self.clients:

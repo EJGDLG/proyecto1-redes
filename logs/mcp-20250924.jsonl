@@ -1,0 +1,2 @@
+{"ts":"2025-09-25T04:53:41Z","server":"local-complexity","direction":"send","type":"jsonrpc","msg":{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}}
+{"ts":"2025-09-25T04:53:41Z","server":"local-complexity","direction":"recv","type":"jsonrpc","msg":{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"code/complexity/analyze","description":"Analiza complejidad ciclomática de un string de código Python.","inputSchema":{"type":"object","properties":{"code":{"type":"string","description":"Código fuente Python"}},"required":["code"]}}]}}}

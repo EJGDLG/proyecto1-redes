@@ -1,37 +1,21 @@
 {
   "servers": [
     {
-      "name": "local-complexity",
-      "command": ["python", "-u", "app/mcp_local/server.py"],
-      "transport": "stdio"
-    },
-    {
       "name": "filesystem",
-      "command": ["filesystem-mcp"],
+      "command": ["python", "app/host/filesystem_mcp.py"],
       "transport": "stdio",
       "optional": true
     },
     {
       "name": "git",
-      "command": ["git-mcp"],
+      "command": ["python", "app/host/git_mcp.py"],
       "transport": "stdio",
       "optional": true
     },
     {
-      "name":"compa1",
-      "command":["python","-u","ruta/al/server1.py"],
-      "transport":"stdio"
-    },
-    {
-      "name":"compa2",
-      "command":["node","ruta/al/server2.js"],
-      "transport":"stdio"
-    },
-    {
       "name": "remote-utils",
-      "transport": "http",
       "url": "https://remote-mcp-utils.onrender.com",
-      "optional": true
+      "transport": "http"
     }
   ]
 }
