@@ -1,162 +1,186 @@
-## Install official MCP servers (stdio transport)
+# MCP Final Project – Streamlit Client & Remote MCP Servers
+
+##  Overview
+This project implements the **Model Context Protocol (MCP)** without relying on external SDKs.  
+Communication is performed directly via **JSON-RPC 2.0** using both **stdio** and **HTTP transports**.  
+
+The system provides:  
+- A **Streamlit Web UI** (`ui_web_streamlit.py`) that integrates with multiple MCP servers.  
+- Local MCP servers for **Filesystem** and **Git**.  
+- A **Remote MCP server** exposing **RSA cryptography** and **Geospatial Maps** tools.  
+- Example support for external servers (e.g., **Movies Chatbot MCP**).  
+
+The project demonstrates how an LLM can interact with MCP servers to perform complex workflows using natural language.
+
+---
+
+##  Features
+- **Filesystem tools**: read, write, list, delete files.  
+- **Git tools**: init, status, commit.  
+- **RSA tools**: generate keys, encrypt, decrypt.  
+- **Maps tool**: generate dual comparative maps using GeoJSON (e.g., Lake Atitlán 2020 vs 2025).  
+- **Extensible architecture**: additional MCP servers can be integrated (e.g., Movies Chatbot).  
+- **Streamlit chat interface**: interactive conversation + MCP tool invocations.  
+- **Logs**: persistent logs of JSON-RPC traffic and LLM interactions.
+
+---
+
+##  Installation
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/EJGDLG/proyecto1-redes.git
+cd proyecto-mcp-final
+```
+
+### 2. Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Install official MCP servers (stdio transport)
 You need the CLI binaries in your PATH. The official implementations are hosted by the MCP community/Anthropic. Install at least one of these variants:
 
-- Filesystem MCP: `filesystem-mcp`
+- Filesystem MCP: `filesystem-mcp`  
 - Git MCP: `git-mcp`
 
-> Tip: If you installed via Node.js packages, expose them with `npx`:
-> - `npx @modelcontextprotocol/server-filesystem`
+> Tip: If installed via Node.js packages, you can expose them with `npx`:  
+> - `npx @modelcontextprotocol/server-filesystem`  
 > - `npx @modelcontextprotocol/server-git`
 
-## Verify commands exist
+### 4. Verify commands exist
 ```bash
 which filesystem-mcp || where filesystem-mcp
 which git-mcp         || where git-mcp
 ```
 
-## servers.config.json (already present)
+---
+
+##  Configuration
 This repo already includes `app/host/servers.config.json` with entries:
 ```json
 {
   "servers": [
     {"name": "local-complexity", "command": ["python", "-u", "app/mcp_local/server.py"], "transport": "stdio"},
     {"name": "filesystem",       "command": ["filesystem-mcp"], "transport": "stdio", "optional": true},
-    {"name": "git",              "command": ["git-mcp"],        "transport": "stdio", "optional": true}
+    {"name": "git",              "command": ["git-mcp"],        "transport": "stdio", "optional": true},
+    {"name": "remote-utils",     "command": ["python", "-u", "server_remote.py"], "transport": "http"}
   ]
 }
 ```
 
-## Run the Host (TUI) and test
+---
+
+##  Usage
+
+### Option 1: Run the TUI (terminal)
 ```bash
 # Windows
 python -m app.ui_tui
+
 # Linux/Mac
 python -m app.ui_tui
 ```
 
-Now type a prompt such as:
-> List the tools on the `filesystem` server and then create a file named `README_MCP_DEMO.md` with the content "Hola MCP". Use the `mcp_call` tool. After that, initialize a Git repo under `./demo_repo`, add the file, and commit with the message "primer commit".
+### Option 2: Run the Web UI (Streamlit)
+```bash
+streamlit run app/ui_web_streamlit.py
+```
 
-The model is configured to use function-calling with the tool `mcp_call`. It should produce a sequence of `tools/list` followed by `tools/call` JSON-RPC calls to the `filesystem` and `git` servers, respectively.
+If Streamlit does not auto-open your browser, visit:  
+- [http://localhost:8501](http://localhost:8501)
 
-## Minimal manual commands (for debugging)
-If you prefer to trigger the calls explicitly via chat:
+---
 
-1) List tools
+##  Test Messages
+
+### Filesystem MCP
+1. Create file:  
+   > "Create a file named `test.txt` with the content 'Hello MCP'."  
+   → Calls `filesystem/write_file`.
+
+2. Read file:  
+   > "Read the content of `test.txt`."  
+   → Calls `filesystem/read_file`.
+
+3. List directory:  
+   > "List all files in the current folder."  
+   → Calls `filesystem/list_dir`.
+
+4. Delete file:  
+   > "Delete `test.txt`."  
+   → Calls `filesystem/delete_file`.
+
+### Git MCP
+1. Init repo:  
+   > "Initialize a Git repository in `./my_repo`."  
+   → Calls `git/init`.
+
+2. Status:  
+   > "Show the status of the repo in `./my_repo`."  
+   → Calls `git/status`.
+
+3. Commit changes:  
+   > "Commit all changes in `./my_repo` with message 'Added test.txt'."  
+   → Calls `git/commit`.
+
+### RSA & Maps (Remote MCP Server)
+1. Generate keys:  
+   > "Generate RSA keys with primes between 50 and 100."  
+
+2. Encrypt:  
+   > "Encrypt the number 25 with the public key."  
+
+3. Decrypt:  
+   > "Decrypt the encrypted number with the private key."  
+
+4. Maps:  
+   > "Generate a comparative map of Lake Atitlán between 2020 and 2025."  
+
+---
+
+##  Debugging
+
+Minimal manual commands (sent via chat input if needed):
+
+- List tools
 ```json
 {"server":"filesystem","method":"tools/list"}
 ```
-2) Create a file (replace `TOOL_NAME` with the one that writes files from the list)
+
+- Write file
 ```json
-{"server":"filesystem","method":"tools/call","params":{"name":"TOOL_NAME","arguments":{"path":"README_MCP_DEMO.md","content":"Hola MCP"}}}
+{"server":"filesystem","method":"tools/call","params":{"name":"filesystem/write_file","arguments":{"path":"README_MCP_DEMO.md","content":"Hello MCP"}}}
 ```
-3) Git init, add, commit (use the tool names returned by `git` server `tools/list`)
+
+- Git init + commit
 ```json
-{"server":"git","method":"tools/call","params":{"name":"GIT_INIT","arguments":{"path":"./demo_repo"}}}
-{"server":"git","method":"tools/call","params":{"name":"GIT_ADD","arguments":{"path":"README_MCP_DEMO.md"}}}
-{"server":"git","method":"tools/call","params":{"name":"GIT_COMMIT","arguments":{"message":"primer commit"}}}
+{"server":"git","method":"tools/call","params":{"name":"git/init","arguments":{"path":"./demo_repo"}}}
+{"server":"git","method":"tools/call","params":{"name":"git/commit","arguments":{"path":"./demo_repo","message":"first commit"}}}
 ```
+
+---
 
 ## Logs
-- LLM interactions: `logs/llm-YYYYMMDD.jsonl`
-- MCP client I/O: `logs/mcp-YYYYMMDD.jsonl` (auto-created when the first MCP call happens)
-
-## Demo checklist to satisfy rubric item 2
-- [ ] `filesystem` responds to `tools/list`
-- [ ] Create file via `tools/call`
-- [ ] `git` responds to `tools/list`
-- [ ] Init repo, add, commit via `tools/call`
-- [ ] Logs show JSON-RPC send/recv for each step
-
-##  Instalación
-
-1. **Clonar o descargar el repositorio**  
-   ```bash
-   git clone https://github.com/EJGDLG/proyecto1-redes.git
-   cd proyecto-mcp-final
+- **LLM interactions**: `logs/llm-YYYYMMDD.jsonl`  
+- **MCP client I/O**: `logs/mcp-YYYYMMDD.jsonl` (created automatically on first MCP call)  
 
 ---
-## Instalar dependencias
-pip install -r requirements.txt
+
+##  Demo checklist
+- [ ] `filesystem` responds to `tools/list`.  
+- [ ] Create a file via `tools/call`.  
+- [ ] `git` responds to `tools/list`.  
+- [ ] Init repo, add, commit via `tools/call`.  
+- [ ] RSA keys, encryption/decryption tested.  
+- [ ] Comparative map generated.  
+- [ ] Logs show JSON-RPC send/recv for each step.  
 
 ---
-## Uso
-1. Ejecutar la interfaz TUI
-python main.py --tui
 
-2. Ejecutar la interfaz web con Streamlit
-streamlit run app/web/streamlit_app.py
-
----
-## Funcionalidades
-
-Pendiente
-
-## mensajes de prueba
-- Flujo integrado (todo junto)
-
-Crear archivo
-
-1. Crea un archivo llamado test.txt con el contenido "Hola MCP".
-
-
-→ Llama filesystem/write_file
-
-Leer archivo
-2. 
-Lee el contenido de test.txt.
-
-
-→ Llama filesystem/read_file
-
-Listar directorio
-
-3. Muéstrame todos los archivos en la carpeta actual.
-
-
-→ Llama filesystem/list_dir
-
-Eliminar archivo
-
-4.Borra el archivo test.txt.
-
-
-→ Llama filesystem/delete_file
-
-🔧 Pruebas para Git (cuando ya tengas git_mcp.py en stdio)
-
-Inicializar repo
-
-1. Inicializa un repositorio Git en la carpeta ./mi_repo
-
-
-→ Llama git/init
-
-Ver estado
-
-2. Dame el estado del repositorio en ./mi_repo
-
-
-→ Llama git/status
-
-Commit cambios
-
-3. Haz commit en ./mi_repo con el mensaje "Se agregó test.txt".
-
-- RCA 
-
-1. Genera llaves RSA con primos entre 50 y 100.
-
-2. Encripta el número 25 con la clave pública generada.
-
-3. Desencripta el número cifrado con la clave privada.
-
-4. Genera un mapa comparativo del lago Atitlán entre 2020 y 2025 y dime la ruta del HTML.
-
-## Notas
-
-- Si Streamlit no abre el navegador automáticamente, accede manualmente a URL.
-
-- Los logs y errores se registran en la terminal o consola de Streamlit.
-
-- Se recomienda mantener las dependencias actualizadas con:
+##  Notes
+- Keep dependencies updated with:  
+  ```bash
+  pip install --upgrade -r requirements.txt
+  ```
+- Streamlit errors/logs will also appear in the terminal where you launched it.
